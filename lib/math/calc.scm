@@ -25,4 +25,10 @@
 (define (sqrt x)
   (sqrt-iter 1.0 x))
 
-
+; べき乗
+(define (^ base exponent)
+  (define (*^ exponent acc)
+    (if (= exponent 0)
+      acc
+      (*^ (- exponent 1) (* acc base))))
+  (*^ exponent 1))
