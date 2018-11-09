@@ -17,3 +17,4 @@
 ; 16
 ; gosh> ((repeated square 2) 5)
 ; 625
+def
