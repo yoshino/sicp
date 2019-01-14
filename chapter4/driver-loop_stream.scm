@@ -1,5 +1,5 @@
 ; originally from https://gist.github.com/mururu/a27918cb98cbbe213dca
-(load "./eval")
+(load "./eval_stream")
 
 ; print
 (define input-prompt ";;; M-Eval input:")

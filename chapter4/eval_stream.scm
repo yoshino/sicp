@@ -2,21 +2,19 @@
 (define apply-in-underlying-scheme apply)
 
 ;;;; apply の定義
-(define (apply procedure arguments env)
+(define (apply procedure arguments)
   (cond ((primitive-procedure? procedure)
-         (apply-primitive-procedure
-           procedure
-           (list-of-arg-values arguments env))) ; 変更した
+         (apply-primitive-procedure procedure arguments))
         ((compound-procedure? procedure)
          (eval-sequence
            (procedure-body procedure)
            (extend-environment
              (procedure-parameters procedure)
-             (list-of-delayed-args arguments env) ; 変更した
+             arguments
              (procedure-environment procedure))))
         (else
-          (error
-            "Unknown procedure type -- APPLY" procedure))))
+         (error
+          "Unknown procedure type -- APPLY" procedure))))
 
 ;;;; eval の定義
 (define (eval exp env)
@@ -34,64 +32,14 @@
          (eval-sequence (begin-actions exp) env))
         ((cond? exp) (eval (cond->if exp) env))
         ((application? exp)
-         (apply (actual-value (operator exp) env)
-                (operands exp)
-                env))
+         (apply (eval (operator exp) env)
+                (operands exp)))
         (else
           (error "Unknown expression type -- EVAL" exp))))
 
-(define (actual-value exp env)
-  (force-it (eval exp env)))
-
-;;;; 引数を処理する手続き
-(define (list-of-arg-values exps env)
-  (if (no-operands? exps)
-      '()
-      (cons (actual-value (first-operand exps) env)
-            (list-of-arg-values (rest-operands exps)
-                                env))))
-
-(define (list-of-delayed-args exps env)
-  (if (no-operands? exps)
-      '()
-      (cons (delay-it (first-operand exps) env)
-            (list-of-delayed-args (rest-operands exps)
-                                  env))))
-
-;;;; サンクの表現
-(define (delay-it exp env)
-  (list 'thunk exp env))
-
-(define (thunk? obj)
-  (tagged-list? obj 'thunk))
-
-(define (thunk-exp thunk) (cadr thunk))
-
-(define (thunk-env thunk) (caddr thunk))
-
-(define (evaluated-thunk? obj)
-  (tagged-list? obj 'evaluated-thunk))
-
-(define (thunk-value evaluated-thunk) (cadr evaluated-thunk))
-
-;; メモ化した force-it
-(define (force-it obj)
-  (cond ((thunk? obj)
-         (let ((result (actual-value
-                         (thunk-exp obj)
-                         (thunk-env obj))))
-              (set-car! obj 'evaluated-thunk)
-              (set-car! (cdr obj) result) ; exp をその値で置き換える
-              (set-cdr! (cdr obj) '()) ; 不要な env を忘れる
-              result))
-        ((evaluated-thunk? obj)
-         (thunk-value obj))
-        (else obj)))
-
-
 ;;;; 条件式
 (define (eval-if exp env)
-  (if (true? (actual-value (if-predicate exp) env))
+  (if (true? (eval (if-predicate exp) env))
       (eval (if-consequent exp) env)
       (eval (if-alternative exp) env)))
 
@@ -348,6 +296,8 @@
         (list '> >)
         (list 'print print)
         ;; 基本手続きが続く
+        (list 'display display)
+        (list 'newline newline)
         ))
 
 (define (primitive-procedure-names)
@@ -366,6 +316,7 @@
        (define-variable! 'true #t initial-env)
        (define-variable! 'false #f initial-env)
        initial-env))
+
 
 (define (primitive-procedure? proc)
   (tagged-list? proc 'primitive))
