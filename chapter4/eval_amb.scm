@@ -23,10 +23,12 @@
         ((quoted? exp) (analyze-quoted exp))
         ((variable? exp) (analyze-variable exp))
         ((assignment? exp) (analyze-assignment exp))
-        ((parmanent-assignment? exp) (analyze-parmanent-assignment exp))
+        ((permanent-assignment? exp) (analyze-permanent-assignment exp))
         ((definition? exp) (analyze-definition exp))
         ((amb? exp) (analyze-amb exp)) ; 追加
+        ((require? exp) (analyze-require exp)) ; 追加
         ((if? exp) (analyze-if exp))
+        ((if-fail? exp) (analyze-if-fail exp))
         ((lambda? exp) (analyze-lambda exp))
         ((let? exp) (analyze (let->combination exp)))
         ((begin? exp) (analyze-sequence (begin-actions exp)))
@@ -34,6 +36,39 @@
         ((application? exp) (analyze-application exp))
         (else
          (error "Unknown expression type -- ANALYZE" exp))))
+
+;---------------------------------------------------------
+; 4.54: require
+;---------------------------------------------------------
+(define (require? exp)
+  (tagged-list? exp 'require))
+(define (require-predicate exp)
+  (cadr exp))
+(define (analyze-require exp)
+  (let ((pproc (analyze (require-predicate exp))))
+    (lambda (env succeed fail)
+      (pproc env
+             (lambda (pred-value fail2)
+                (if (not (true? pred-value))
+                   (fail2)
+                   (succeed 'ok fail2)))
+             fail))))
+
+;---------------------------------------------------------
+; 4.52: if-fail
+;---------------------------------------------------------
+(define (if-fail? exp) (tagged-list? exp 'if-fail))
+(define (if-success exp) (cadr exp))
+(define (if-fail exp) (caddr exp))
+
+(define (analyze-if-fail exp)
+  (let ((proc-success (analyze (if-success exp)))
+        (proc-fail (analyze (if-fail exp))))
+    (lambda (env succeed fail)
+      (proc-success env
+                    succeed
+                    (lambda () (proc-fail env succeed fail))))))
+
 
 ;---------------------------------------------------------
 ; amb式の評価
@@ -183,7 +218,7 @@
              fail))))
 
 ; 4.51: permanent-set!'
-(define (analyze-parmanent-assignment exp)
+(define (analyze-permanent-assignment exp)
   (let ((var (assignment-variable exp))
         (vproc (analyze (assignment-value exp))))
     (lambda (env succeed fail)
@@ -321,8 +356,8 @@
 (define (assignment-value exp) (caddr exp))
 
 ; parmanent-assignment
-(define (parmanent-assignment? exp)
- (tagged-list? exp 'parmanent-set!))
+(define (permanent-assignment? exp)
+ (tagged-list? exp 'permanent-set!))
 
 ; definition
 (define (definition? exp)
@@ -384,6 +419,7 @@
 ; cond
 (define (cond? exp) (tagged-list? exp 'cond))
 (define (cond-clauses exp) (cdr exp))
+(define (cond-predicate exp) (cadr exp))
 (define (cond-else-clause? clause)
  (eq? (cond-predicate clause) 'else))
 (define (cond-actions clause) (cdr clause))
@@ -420,6 +456,11 @@
        (list '* *)
        (list '/ /)
        (list '= =)
+       (list 'even? even?)
+       (list 'odd? odd?)
+       (list 'remainder remainder)
+       (list 'square square)
+       (list 'cond cond)
  ))
 (define (primitive-procedure? proc)
  (tagged-list? proc 'primitive))
