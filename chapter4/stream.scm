@@ -21,6 +21,17 @@
       (stream-car s)
       (stream-ref (stream-cdr s) (- n 1))))
 
+(define (stream-for-each proc s)
+  (if (stream-null? s)
+      'done
+      (begin (proc (stream-car s))
+             (stream-for-each proc (stream-cdr s)))))
+
+(define (display-stream s)
+  (stream-for-each display-line s))
+
+(define (display-line x) (newline) (display x))
+
 ;streamの結合
 (define (add-streams s1 s2) (stream-map + s1 s2))
 (define (div-streams s1 s2) (stream-map / s1 s2))
@@ -30,10 +41,10 @@
 (define (interleave s1 s2)
   (if (stream-null? s1)
       s2
-      (cons-stream (stream-car s1)
+      (stream-cons (stream-car s1)
                    (interleave s2 (stream-cdr s1)))))
 (define (pairs s t)
-  (cons-stream
+  (stream-cons
     (list (stream-car s) (stream-car t))
     (interleave
       (stream-map (lambda (x) (list (stream-car s) x))
@@ -43,7 +54,7 @@
 (define (stream-append s1 s2)
   (if (stream-null? s1)
       s2
-      (cons-stream (stream-car s1)
+      (stream-cons (stream-car s1)
                    (stream-append (stream-cdr s1) s2))))
 
 ;delayとforce: sample
@@ -92,8 +103,16 @@
 (define (interleave-delayed s1 delayed-s2)
   (if (stream-null? s1)
       (force delayed-s2)
-      (cons-stream
+      (stream-cons
         (stream-car s1)
         (interleave-delayed
           (force delayed-s2)
           (delay (stream-cdr s1))))))
+
+(define (singleton-stream x)
+  (stream-cons x the-empty-stream))
+
+;テーブル内のストリームを検索
+(define (get-stream key1 key2)
+  (let ((s (get key1 key2)))
+   (if s s the-empty-stream)))
