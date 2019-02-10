@@ -12,6 +12,8 @@
 
 ;; 単純クエリ
 (define (simple-query query-pattern frame-stream)
+  (newline)
+  (display '=>simple-query!)
   (stream-flatmap
     (lambda (frame)
       (stream-append-delayed                         ; AとBを組み合わせた大きなストリームを生成する
@@ -20,17 +22,21 @@
     frame-stream))
 
 ;; 複合クエリ(AND)
-;;(put 'and 'qeval conjoin)
 ;; クエリを適用したものを再帰的にconjoinに渡していく
+;(put 'and 'qeval conjoin)
 (define (conjoin conjuncts frame-stream)
+  (display '=>and-query!)
+  (newline)
   (if (empty-conjunction? conjuncts)
       frame-stream
       (conjoin (rest-conjuncts conjuncts) (qeval (first-conjunct conjuncts) frame-stream))))
 
 ;; 複合クエリ(OR)
-;; (put 'or 'qeval disjoin)
 ;; クエリは別々に計算されinterleave-delayed 手続きによって結合される
+;(put 'or 'qeval disjoin)
 (define (disjoin disjuncts frame-stream )
+  (display '=>or-query!)
+  (newline)
   (if (empty-disjunction? disjuncts)
       the-empty-stream
       (interleave-delayed (qeval (first-disjunct disjuncts) frame-stream)
@@ -100,6 +106,12 @@
         (else 'failed)))
 
 ;フレームにすでにある束縛と矛盾しない範囲で新しい束縛を追加してフレームを拡張する手続き
+
+; extendを実はoverrideしている
+; extendをつかうものよりも手間で評価しないとイケない
+(define (extend variable value frame )
+  (cons (make-binding variable value) frame))
+
 (define (extend-if-consistent var dat frame)
   (let ((binding (binding-in-frame var frame)))
    (if binding
@@ -216,13 +228,14 @@
     (get-stream ( index-key-of pattern ) 'rule-stream )
     (get-stream '? 'rule-stream ))) ;結論が変数で始まるすべての規則をテーブル内の独立したストリームに格納
 
-
 (define (add-rule-or-assertion! assertion)
   (if (rule? assertion)
       (add-rule! assertion)
       (add-assertion! assertion)))
 
 (define (add-assertion! assertion)
+  (display '=>add-assertion!)
+  (newline)
   (store-assertion-in-index assertion)
   (let ((old-assertions THE-ASSERTIONS))
    (set! THE-ASSERTIONS ;データベース内のすべての表明のストリームに格納される
@@ -230,10 +243,17 @@
    'ok))
 
 (define (add-rule! rule)
+  (display '=>add-rule!)
+  (newline)
   (store-rule-in-index rule)
   (let ((old-rules THE-RULES))
    (set! THE-RULES (stream-cons rule old-rules))
    'ok))
+
+(define (add-rule-or-assertion! assertion)
+  (if (rule? assertion)
+    (add-rule! assertion)
+    (add-assertion! assertion)))
 
 (define (store-assertion-in-index assertion)
   (if (indexable? assertion)
@@ -246,16 +266,17 @@
                 assertion
                 current-assertion-stream))))))
 
+; putを使ってテーブルに格納する
 (define (store-rule-in-index rule)
   (let ((pattern (conclusion rule)))
    (if (indexable? pattern)
        (let ((key (index-key-of pattern)))
-        (let (( current-rule-stream
+        (let ((current-rule-stream
                 (get-stream key 'rule-stream)))
           (put key
                'rule-stream
                (stream-cons rule
-                            current-rule-stream )))))))
+                            current-rule-stream)))))))
 
 ;先頭が変数または定数記号であればテーブルに格納されます。
 (define (indexable? pat)
@@ -397,7 +418,7 @@
     (cond ((assertion-to-be-added? q)
            (add-rule-or-assertion! (add-assertion-body q))
            (newline)
-           (display " Assertion added to data base.")
+           (display "Assertion added to data base.")
            (query-driver-loop))
           (else
             (newline)
@@ -410,7 +431,10 @@
                     frame
                     (lambda (v f)
                       (contract-question-mark v))))
-                (qeval q ( singleton-stream ' ()))))
+                (qeval q (singleton-stream ' ()))))
             (query-driver-loop)))))
 
+;;---------------------------------------------------------------------------------
+;;実行
+;;---------------------------------------------------------------------------------
 (query-driver-loop)

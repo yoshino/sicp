@@ -81,7 +81,7 @@
 ;;------------------------------------------------------------
 ;; Chapter4
 ;;------------------------------------------------------------
-(defin (stream-flatmap proc s)
+(define (stream-flatmap proc s)
   (flatten-stream (stream-map proc s)))
 
 (define (flatten-stream stream)
