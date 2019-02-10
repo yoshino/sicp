@@ -1,4 +1,5 @@
 (use util.stream)
+(load "./table")
 ; https://practical-scheme.net/gauche/man/gauche-refj/sutorimuraiburari.html
 ; stream-null?
 ; stream-null
@@ -115,4 +116,4 @@
 ;テーブル内のストリームを検索
 (define (get-stream key1 key2)
   (let ((s (get key1 key2)))
-   (if s s the-empty-stream)))
+    (if s s the-empty-stream)))

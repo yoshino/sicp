@@ -1,5 +1,5 @@
-(load "./stream.scm")
 (load "./table.scm")
+(load "./stream.scm")
 
 ;;---------------------------------------------------------------------------------
 ;; 4.4.4.2: 評価器
@@ -34,7 +34,7 @@
 ;; 複合クエリ(OR)
 ;; クエリは別々に計算されinterleave-delayed 手続きによって結合される
 ;(put 'or 'qeval disjoin)
-(define (disjoin disjuncts frame-stream )
+(define (disjoin disjuncts frame-stream)
   (display '=>or-query!)
   (newline)
   (if (empty-disjunction? disjuncts)
@@ -45,11 +45,24 @@
 ;; フィルタ(NOT)
 ;; (put 'not 'qeval negate )
 (define (negate operands frame-stream)
+  (display '=>not-filter)
+  (newline)
   (stream-flatmap
     (lambda (frame)
       (if (stream-null? (qeval (negated-query operands) (singleton-stream frame)))
           (singleton-stream frame)
           the-empty-stream))
+    frame-stream))
+
+;; Unique
+(define (unique operands frame-stream)
+  (stream-flatmap
+    (lambda (frame)
+      (let ((result (qeval (unique-query operands) (singleton-stream frame))))
+       (if (and (not (stream-null? result))
+                (stream-null? (stream-cdr result)))
+           result              ;; 唯一個の結果を持つストリームの場合
+           the-empty-stream))) ;; 結果が無いか、2個以上の結果を持つ場合
     frame-stream))
 
 ;; フィルタ(lisp-value): whereみたいなもの
@@ -68,6 +81,7 @@
     frame-stream))
 
 ;; execute
+(define user-initial-environment interaction-environment)
 (define (execute exp)
   (apply (eval (predicate exp) user-initial-environment)
          (args exp)))
@@ -182,7 +196,7 @@
            'failed)
           (else (extend var val frame )))))
 
-; ターン変数の値として提案された式がその変数に依存するかどうかテストする述語です
+; パターン変数の値として提案された式がその変数に依存するかどうかテストする述語です
 ; tree-walkは再帰探索の意味
 (define (depends-on? exp var frame)
   (define (tree-walk e)
@@ -192,11 +206,11 @@
                (let ((b (binding-in-frame e frame)))
                  (if b
                      (tree-walk (binding-value b))
-                     false))))
+                     #f))))
           ((pair? e)
            (or (tree-walk (car e))
                (tree-walk (cdr e))))
-          (else false)))
+          (else #f)))
   (tree-walk exp))
 
 ;;---------------------------------------------------------------------------------
@@ -318,6 +332,7 @@
 (define (first-disjunct exps) (car exps))
 (define (rest-disjuncts exps) (cdr exps))
 (define (negated-query exps) (car exps))
+(define (unique-query exps) (car exps))
 (define (predicate exps) (car exps))
 (define (args exps) (cdr exps))
 
@@ -435,6 +450,117 @@
             (query-driver-loop)))))
 
 ;;---------------------------------------------------------------------------------
+;;data
+;;---------------------------------------------------------------------------------
+(define get '())
+(define put '())
+
+(define (initialize-data-base rules-and-assertions)
+  (define (deal-out r-and-a rules assertions)
+    (cond ((null? r-and-a)
+           (set! THE-ASSERTIONS (list->stream assertions))
+           (set! THE-RULES (list->stream rules))
+           'done)
+          (else
+           (let ((s (query-syntax-process (car r-and-a))))
+             (cond ((rule? s)
+                    (store-rule-in-index s)
+                    (deal-out (cdr r-and-a)
+                              (cons s rules)
+                              assertions))
+                   (else
+                    (store-assertion-in-index s)
+                    (deal-out (cdr r-and-a)
+                              rules
+                              (cons s assertions))))))))
+  (let ((operation-table (make-table)))
+    (set! get (operation-table 'lookup-proc))
+    (set! put (operation-table 'insert-proc!)))
+  (put 'and 'qeval conjoin)
+  (put 'or 'qeval disjoin)
+  (put 'not 'qeval negate)
+  (put 'unique 'qeval unique)
+  (put 'lisp-value 'qeval lisp-value)
+  (put 'always-true 'qeval always-true)
+  (deal-out rules-and-assertions '() '()))
+
+(define microshaft-data-base
+  '(
+;; from section 4.4.1
+(address (Bitdiddle Ben) (Slumerville (Ridge Road) 10))
+(job (Bitdiddle Ben) (computer wizard))
+(salary (Bitdiddle Ben) 60000)
+
+(address (Hacker Alyssa P) (Cambridge (Mass Ave) 78))
+(job (Hacker Alyssa P) (computer programmer))
+(salary (Hacker Alyssa P) 40000)
+(supervisor (Hacker Alyssa P) (Bitdiddle Ben))
+
+(address (Fect Cy D) (Cambridge (Ames Street) 3))
+(job (Fect Cy D) (computer programmer))
+(salary (Fect Cy D) 35000)
+(supervisor (Fect Cy D) (Bitdiddle Ben))
+
+(address (Tweakit Lem E) (Boston (Bay State Road) 22))
+(job (Tweakit Lem E) (computer technician))
+(salary (Tweakit Lem E) 25000)
+(supervisor (Tweakit Lem E) (Bitdiddle Ben))
+
+(address (Reasoner Louis) (Slumerville (Pine Tree Road) 80))
+(job (Reasoner Louis) (computer programmer trainee))
+(salary (Reasoner Louis) 30000)
+(supervisor (Reasoner Louis) (Hacker Alyssa P))
+
+(supervisor (Bitdiddle Ben) (Warbucks Oliver))
+
+(address (Warbucks Oliver) (Swellesley (Top Heap Road)))
+(job (Warbucks Oliver) (administration big wheel))
+(salary (Warbucks Oliver) 150000)
+
+(address (Scrooge Eben) (Weston (Shady Lane) 10))
+(job (Scrooge Eben) (accounting chief accountant))
+(salary (Scrooge Eben) 75000)
+(supervisor (Scrooge Eben) (Warbucks Oliver))
+
+(address (Cratchet Robert) (Allston (N Harvard Street) 16))
+(job (Cratchet Robert) (accounting scrivener))
+(salary (Cratchet Robert) 18000)
+(supervisor (Cratchet Robert) (Scrooge Eben))
+
+(address (Aull DeWitt) (Slumerville (Onion Square) 5))
+(job (Aull DeWitt) (administration secretary))
+(salary (Aull DeWitt) 25000)
+(supervisor (Aull DeWitt) (Warbucks Oliver))
+
+(can-do-job (computer wizard) (computer programmer))
+(can-do-job (computer wizard) (computer technician))
+
+(can-do-job (computer programmer)
+            (computer programmer trainee))
+
+(can-do-job (administration secretary)
+            (administration big wheel))
+
+(rule (lives-near ?person-1 ?person-2)
+      (and (address ?person-1 (?town . ?rest-1))
+           (address ?person-2 (?town . ?rest-2))
+           (not (same ?person-1 ?person-2))))
+
+(rule (same ?x ?x))
+
+(rule (wheel ?person)
+      (and (supervisor ?middle-manager ?person)
+           (supervisor ?x ?middle-manager)))
+
+(rule (outranked-by ?staff-person ?boss)
+      (or (supervisor ?staff-person ?boss)
+          (and (supervisor ?staff-person ?middle-manager)
+               (outranked-by ?middle-manager ?boss))))
+
+))
+
+;;---------------------------------------------------------------------------------
 ;;実行
 ;;---------------------------------------------------------------------------------
+(initialize-data-base microshaft-data-base) ; query-driver-loopより先に実行すること！！
 (query-driver-loop)

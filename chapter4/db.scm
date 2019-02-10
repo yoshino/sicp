@@ -38,5 +38,5 @@
 (assert! (can-do-job ( administration secretary ) (administration big wheel )))
 
 (assert! (rule (job ?x (computer programmer))))
-(asseet! (rule (and ((job ?x (computer programmer))
-                     (salary ?x 60000)))))
+(salary ?x 35000)
+

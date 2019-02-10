@@ -1,23 +1,23 @@
-;; uniqueを実装せよ
-; (unique (job ?x ( computer wizard)))
-
-;; フィルタ(NOT)を参考にする
-;; (put 'not 'qeval negate)
-(define (negate operands frame-stream)
-  (stream-flatmap
-    (lambda (frame)
-      (if (stream-null? (qeval (negated-query operands) (singleton-stream frame)))
-          (singleton-stream frame)
-          the-empty-stream))
-    frame-stream))
-
-;;---------------------------------------------------------
-;; unique
-;;---------------------------------------------------------
+;; Unique
 (define (unique operands frame-stream)
   (stream-flatmap
     (lambda (frame)
-      (if (stream-null? (stream-cdr (qeval (unique-query operands) (singleton-stream frame))))
-          (singleton-stream frame)
-          the-empty-stream))
+      (let ((result (qeval (unique-query operands) (singleton-stream frame))))
+       (if (and (not (stream-null? result))
+                (stream-null? (stream-cdr result)))
+           result
+           the-empty-stream)))
     frame-stream))
+
+;;; Query input :
+(unique (salary ?x ?y))
+
+;;; Query results :
+=>simple-query!
+
+;;; Query input :
+(unique (salary ?x 35000))
+
+;;; Query results :
+=>simple-query!
+(unique (salary (Fect Cy D) 35000))
