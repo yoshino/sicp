@@ -1,0 +1,3 @@
+(load "./machine")
+
+;pcを'()にして
