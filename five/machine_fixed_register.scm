@@ -1,4 +1,14 @@
 ;;--------------------------------------------------------
+;; About: ref: practice_5.11b
+;;--------------------------------------------------------
+; stackにsaveする時にレジスタの名前を保存して、
+; restoreする時に指定したレジスタの名前がスタックの一番上にあるかどうかを
+; 確認している
+
+; 変更した手続き
+; make-restore, make-save
+
+;;--------------------------------------------------------
 ;; 別の章からの共通要素
 ;;--------------------------------------------------------
 (define (tagged-list? x tag)
@@ -286,18 +296,22 @@
 (define (goto-dest goto-instruction) (cadr goto-instruction))
 
 ;その他の命令
-(define (make-save inst machine stack pc)
-  (let ((reg (get-register machine (stack-inst-reg-name inst))))
-   (lambda ()
-     (push stack (get-contents reg))
-     (advance-pc pc))))
-
 (define (make-restore inst machine stack pc)
   (let ((reg (get-register machine
                            (stack-inst-reg-name inst))))
     (lambda ()
-      (set-contents! reg (pop stack))
-      (advance-pc pc))))
+      (let ((val (pop stack)))
+       (cond ((eq? reg (car val))
+       (set-contents! reg (cdr val))
+       (advance-pc pc))
+       (else
+        (error "RESTORE require the same register as save, but" reg)))))))
+
+(define (make-save inst machine stack pc)
+  (let ((reg (get-register machine (stack-inst-reg-name inst))))
+   (lambda ()
+     (push stack (cons reg (get-contents reg))) ;※ regも一緒にcons
+     (advance-pc pc))))
 
 (define (stack-inst-reg-name stack-instruction)
   (cadr stack-instruction))

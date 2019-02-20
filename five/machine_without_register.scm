@@ -19,11 +19,20 @@
    machine))
 
 ;;レジスタ
+;;スタックをもたせる
+;;スタックは必要ないので削除
 (define (make-register name)
-  (let ((contents '*unassigned*))
+  (let ((contents '()))
+   (define (set x) (set! s (cons x s)))
+   (define (get)
+     (if (null? s)
+         (error "Empty stack : POP")
+         (let ((top (car s)))
+          (set! s (cdr s))
+          top)))
    (define (dispatch message)
-     (cond ((eq? message 'get) contents)
-           ((eq? message 'set)
+     (cond ((eq? message 'set) set)
+           ((eq? message 'get (get))
             (lambda (value) (set! contents value)))
            (else
              (error " Unknown request : REGISTER " message))))
@@ -31,27 +40,6 @@
 (define (get-contents register) (register 'get))
 (define (set-contents! register value) ((register 'set) value))
 
-;;スタック
-(define (make-stack)
-  (let ((s '()))
-   (define (push x) (set! s (cons x s)))
-   (define (pop)
-     (if (null? s)
-         (error "Empty stack : POP")
-         (let ((top (car s)))
-          (set! s (cdr s))
-          top)))
-   (define (initialize)
-     (set! s '())
-     'done)
-   (define (dispatch message)
-     (cond ((eq? message 'push) push)
-           ((eq? message 'pop) (pop))
-           ((eq? message 'initialize) (initialize))
-           (else (error " Unknown request : STACK " message))))
-   dispatch))
-(define (pop stack) (stack 'pop))
-(define (push stack value) ((stack 'push) value))
 
 ;;基本マシン
 (define (make-new-machine)
@@ -286,18 +274,23 @@
 (define (goto-dest goto-instruction) (cadr goto-instruction))
 
 ;その他の命令
-(define (make-save inst machine stack pc)
-  (let ((reg (get-register machine (stack-inst-reg-name inst))))
-   (lambda ()
-     (push stack (get-contents reg))
-     (advance-pc pc))))
-
 (define (make-restore inst machine stack pc)
   (let ((reg (get-register machine
                            (stack-inst-reg-name inst))))
     (lambda ()
-      (set-contents! reg (pop stack))
-      (advance-pc pc))))
+      (let ((val (pop stack)))
+       (cond ((eq? reg (car val))
+       (set-contents! reg (cdr val))
+       (advance-pc pc))
+       (else
+        (error "RESTORE require the same register as save, but" reg)))))))
+
+(define (make-save inst machine stack pc)
+  (let ((reg (get-register machine (stack-inst-reg-name inst))))
+   (lambda ()
+     (push stack (cons reg (get-contents reg))) ;※ regも一緒にcons
+     (advance-pc pc))))
+
 
 (define (stack-inst-reg-name stack-instruction)
   (cadr stack-instruction))
