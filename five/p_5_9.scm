@@ -16,7 +16,6 @@
 ;(get-register-contents machine 'a)
 ;gosh> #t
 
-
 ;; labelを禁止
 (define (make-operation-exp exp machine labels operations)
   (display '-----------------make-operation-exp------------------------------)

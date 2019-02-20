@@ -126,8 +126,6 @@
 
 ;extract-labels は、text の要素を順に走査し、insts と labels を集積(cons)していく
 (define (extract-labels text receive)
-  (display '-------------extract-labels------------------)
-  (newline)
   (if (null? text)
       (receive '() '())
       (extract-labels
@@ -148,14 +146,6 @@
 ;命令リストは初期状態では命令のテキストしか持っていませんが、
 ;それに対応する実行手続きを追加
 (define (update-insts! insts labels machine)
-  (display '--------------------insts-----------------------------)
-  (newline)
-  (display insts)
-  (newline)
-  (display '--------------------labels-----------------------------)
-  (newline)
-  (display labels)
-  (newline)
   (let ((pc (get-register machine 'pc))
         (flag (get-register machine 'flag))
         (stack (machine 'stack))
@@ -193,16 +183,6 @@
 ;;--------------------------------------------------------
 (define (make-execution-procedure
           inst labels machine pc flag stack ops)
-  (display '------------------make-execution-procedure--------------------)
-  (newline)
-  (display 'inst)
-  (newline)
-  (display inst)
-  (newline)
-  (display 'labels)
-  (newline)
-  (display labels)
-  (newline)
   (cond ((eq? (car inst) 'assign)
          (make-assign inst machine labels ops pc))
         ((eq? (car inst) 'test)
@@ -254,16 +234,6 @@
 ;(test (op =) (reg b) (const 0))
 ;(branch (label gcd-done))
 (define (make-test inst machine labels operations flag pc)
-  (display '------------------make-test--------------------)
-  (newline)
-  (display 'inst)
-  (newline)
-  (display inst)
-  (newline)
-  (display 'labels)
-  (newline)
-  (display labels)
-  (newline)
   (let ((condition (test-condition inst)))
    (if (operation-exp? condition)
        (let ((condition-proc
@@ -299,21 +269,11 @@
 ;チェックするべき条件がないというところが異なる
 ;pc は常に新しい目的地に設定される
 (define (make-goto inst machine labels pc)
-  (display '------------make-goto------------------)
-  (newline)
   (let ((dest (goto-dest inst)))
-   (display 'dest)
-   (newline)
-   (display dest)
-   (newline)
    (cond ((label-exp? dest)     ;ラベルに規定
           (let ((insts (lookup-label
                          labels
                          (label-exp-label dest))))
-            (display 'insts)
-            (newline)
-            (display insts)
-            (newline)
             (lambda () (set-contents! pc insts))))
          ((register-exp? dest)  ;レジスタに規定
           (let ((reg (get-register
@@ -326,19 +286,23 @@
 (define (goto-dest goto-instruction) (cadr goto-instruction))
 
 ;その他の命令
-(define (make-save inst machine stack pc)
-  (let ((reg (get-register machine
-                           (stack-inst-reg-name inst ))))
-                           (lambda ()
-                             (push stack ( get-contents reg))
-                             (advance-pc pc))))
-
 (define (make-restore inst machine stack pc)
   (let ((reg (get-register machine
                            (stack-inst-reg-name inst))))
     (lambda ()
-      (set-contents! reg (pop stack))
-      (advance-pc pc))))
+      (let ((val (pop stack)))
+       (cond ((eq? reg (car val))
+       (set-contents! reg (cdr val))
+       (advance-pc pc))
+       (else
+        (error "RESTORE require the same register as save, but" reg)))))))
+
+(define (make-save inst machine stack pc)
+  (let ((reg (get-register machine (stack-inst-reg-name inst))))
+   (lambda ()
+     (push stack (cons reg (get-contents reg))) ;※ regも一緒にcons
+     (advance-pc pc))))
+
 
 (define (stack-inst-reg-name stack-instruction)
   (cadr stack-instruction))
@@ -377,16 +341,6 @@
 (define (label-exp-label exp) (cadr exp))
 
 (define (make-operation-exp exp machine labels operations)
-  (display '-----------------make-operation-exp------------------------------)
-  (newline)
-  (display 'exp)
-  (newline)
-  (display exp)
-  (newline)
-  (display 'operations)
-  (newline)
-  (display operations)
-  (newline)
   (let ((op (lookup-prim (operation-exp-op exp)
                           operations))
         (aprocs
