@@ -19,27 +19,43 @@
    machine))
 
 ;;レジスタ
-;;スタックをもたせる
-;;スタックは必要ないので削除
 (define (make-register name)
-  (let ((contents '()))
-   (define (set x) (set! s (cons x s)))
-   (define (get)
-     (if (null? s)
-         (error "Empty stack : POP")
-         (let ((top (car s)))
-          (set! s (cdr s))
-          top)))
+  (let ((contents '*unassigned*)
+        (stack (make-stack)))
    (define (dispatch message)
-     (cond ((eq? message 'set) set)
-           ((eq? message 'get (get))
+     (cond ((eq? message 'get) contents)
+           ((eq? message 'set)
             (lambda (value) (set! contents value)))
+           ((eq? message 'push) (stack 'push))
+           ((eq? message 'pop) (stack 'pop))
+           ((eq? message 'initialize) (stack 'initialize))
            (else
              (error " Unknown request : REGISTER " message))))
    dispatch))
 (define (get-contents register) (register 'get))
 (define (set-contents! register value) ((register 'set) value))
 
+;;スタック
+(define (make-stack)
+  (let ((s '()))
+   (define (push x) (set! s (cons x s)))
+   (define (pop)
+     (if (null? s)
+         (error "Empty stack : POP")
+         (let ((top (car s)))
+          (set! s (cdr s))
+          top)))
+   (define (initialize)
+     (set! s '())
+     'done)
+   (define (dispatch message)
+     (cond ((eq? message 'push) push)
+           ((eq? message 'pop) (pop))
+           ((eq? message 'initialize) (initialize))
+           (else (error " Unknown request : STACK " message))))
+   dispatch))
+(define (pop stack) (stack 'pop))
+(define (push stack value) ((stack 'push) value))
 
 ;;基本マシン
 (define (make-new-machine)
@@ -53,11 +69,14 @@
           (register-table
             (list (list 'pc pc) (list 'flag flag))))
       (define (allocate-register name)
-        (if (assoc name register-table )
-            (error " Multiply defined register : " name)
-            (set! register-table
-              (cons (list name (make-register name))
-                    register-table)))
+        (if (assoc name register-table)
+            (error "Multiply define register: " name)
+            (begin
+              (let ((reg (make-register name)))
+                (set! register-table
+                      (cons (list name reg)
+                            register-table))
+                (reg 'initialize))))
         'register-allocated)
       (define (lookup-register name)
         (let (( val (assoc name register-table)))
@@ -274,23 +293,18 @@
 (define (goto-dest goto-instruction) (cadr goto-instruction))
 
 ;その他の命令
+(define (make-save inst machine stack pc)
+  (let ((reg (get-register machine (stack-inst-reg-name inst))))
+   (lambda ()
+     (push reg (get-contents reg))
+     (advance-pc pc))))
+
 (define (make-restore inst machine stack pc)
   (let ((reg (get-register machine
                            (stack-inst-reg-name inst))))
     (lambda ()
-      (let ((val (pop stack)))
-       (cond ((eq? reg (car val))
-       (set-contents! reg (cdr val))
-       (advance-pc pc))
-       (else
-        (error "RESTORE require the same register as save, but" reg)))))))
-
-(define (make-save inst machine stack pc)
-  (let ((reg (get-register machine (stack-inst-reg-name inst))))
-   (lambda ()
-     (push stack (cons reg (get-contents reg))) ;※ regも一緒にcons
-     (advance-pc pc))))
-
+      (set-contents! reg (pop reg))
+      (advance-pc pc))))
 
 (define (stack-inst-reg-name stack-instruction)
   (cadr stack-instruction))
