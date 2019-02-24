@@ -76,10 +76,12 @@
 
 ;;基本マシン
 (define (make-new-machine)
-  (let ((pc (make-register 'pc))     ;Program Counter
-        (flag (make-register 'flag)) ;シミュレート対象のマシンの分岐を制御するために使う
+  (let ((pc (make-register 'pc))           ;Program Counter
+        (flag (make-register 'flag))       ;シミュレート対象のマシンの分岐を制御するために使う
         (stack (make-stack))
-        (the-instruction-sequence '()))
+        (the-instruction-sequence '())
+        (counter 0)
+        )
     (let ((the-ops
             (list (list 'initialize-stack
                         (lambda () (stack 'initialize)))
@@ -105,7 +107,10 @@
              'done
              (begin
                ((instruction-execution-proc (car insts)))    ; 直列に命令を実行している
+               (set! counter (+ 1 counter))
                (execute)))))
+      (define (print-counter)
+        (display (list 'OREDER_COUNTER= counter)))
       (define (dispatch message)
         (cond ((eq? message 'start)
                (set-contents! pc the-instruction-sequence)
@@ -121,11 +126,13 @@
               ((eq? message 'stack) stack)
               ((eq? message 'monitor-stack) (print-statistics stack))
               ((eq? message 'operations) the-ops)
+              ((eq? message 'print-counter) (print-counter))
               (else (error " Unknown request : MACHINE "
                            message))))
       dispatch)))
 
 (define (start machine) (machine 'start))
+(define (print-counter machine) (machine 'print-counter))
 (define (monitor-stack machine) (machine 'monitor-stack))
 
 (define (get-register-contents machine register-name)
