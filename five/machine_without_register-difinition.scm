@@ -1,3 +1,5 @@
+;;5.12
+
 ;;--------------------------------------------------------
 ;; 別の章からの共通要素
 ;;--------------------------------------------------------
@@ -7,12 +9,8 @@
 ;;--------------------------------------------------------
 ;;5.2.1: machine-model
 ;;--------------------------------------------------------
-(define (make-machine register-names ops controller-text)
+(define (make-machine ops controller-text)
   (let ((machine (make-new-machine)))
-   (for-each ; 新しいマシンの中にレジスタを割り当てる
-     (lambda (register-name)
-       ((machine 'allocate-register) register-name))
-     register-names)
    ((machine 'install-operations) ops)
    ((machine 'install-instruction-sequence) ;マシンの命令に変換
     (assemble controller-text machine))
@@ -29,7 +27,8 @@
              (error " Unknown request : REGISTER " message))))
    dispatch))
 (define (get-contents register) (register 'get))
-(define (set-contents! register value) ((register 'set) value))
+(define (set-contents! register value)
+  ((register 'set) value))
 
 ;;スタック
 (define (make-stack)
@@ -72,10 +71,12 @@
                     register-table)))
         'register-allocated)
       (define (lookup-register name)
-        (let (( val (assoc name register-table)))
+        (let ((val (assoc name register-table)))
          (if val
              (cadr val)
-             (error " Unknown register :" name ))))
+             (begin
+               (allocate-register name)
+               (lookup-register name)))))
       (define (execute)
         (let ((insts (get-contents pc)))
          (if (null? insts)

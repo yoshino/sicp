@@ -1,5 +1,14 @@
-(load "./machine_without_register-difinition")
+;;変更点
+;;define (make-new-machine)
+(define (lookup-register name)
+  (let ((val (assoc name register-table)))
+   (if val
+       (cadr val)
+       (begin
+         (allocate-register name)
+         (lookup-register name))))) ;; 返り値を何にするかを考えなくてよいのでもう一度呼び出すのが吉
 
+(load "./machine_without_register-difinition")
 ;;フィボナッチ
 (define fib-machine
   (make-machine
