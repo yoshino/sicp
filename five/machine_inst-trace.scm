@@ -1,3 +1,5 @@
+;;practice: 5.16, 5.17
+
 ;;--------------------------------------------------------
 ;; 別の章からの共通要素
 ;;--------------------------------------------------------
@@ -62,6 +64,7 @@
         (stack (make-stack))
         (the-instruction-sequence '())
         (trace-mode #f)
+        (label #f)
         )
     (let ((the-ops
             (list (list 'initialize-stack
@@ -85,11 +88,15 @@
          (if (null? insts)
              'done
              (begin
-               ((instruction-execution-proc (car insts)))    ; 直列に命令を実行している
+               ;; ラベルをセット
+               (if (eq? (caaar insts) 'label)
+                   (set! label (cadr (caar insts))))
+               ;; 命令を出力するかどうか？
                (if trace-mode
                    (begin
                      (newline)
-                     (display (list 'inst-trace: (car insts)))))
+                     (display (list 'label: label 'inst-trace: (car insts)))))
+               ((instruction-execution-proc (car insts)))    ; 直列に命令を実行している
                (execute)))))
       (define (trace-flag flag)
         (if (eq? flag 'trace-on)
@@ -144,16 +151,18 @@
         (cdr text)
         (lambda (insts labels)
           (let ((next-inst (car text)))
-           (if (assoc next-inst labels)  ;;重複したlabelはエラー
-               (error "Duplicated labels" labels)
-             (if (symbol? next-inst)
-                 (receive insts
-                          (cons (make-label-entry next-inst
-                                                  insts)
-                                labels))
-                 (receive (cons (make-instruction next-inst)
-                                insts)
-                          labels))))))))
+           (if (symbol? next-inst)
+               (if (assoc next-inst labels)  ;;重複したlabelはエラー
+                   (error "Duplicated labels" labels)
+                   (let ((insts
+                           (cons (list (list 'label next-inst)) insts))) ;;5.17
+                     (receive insts
+                              (cons (make-label-entry next-inst
+                                                      insts)
+                                    labels))))
+             (receive (cons (make-instruction next-inst)
+                            insts)
+                      labels)))))))
 
 ;命令リストは初期状態では命令のテキストしか持っていませんが、
 ;それに対応する実行手続きを追加
@@ -209,6 +218,8 @@
          (make-restore inst machine stack pc))
         ((eq? (car inst) 'perform)
          (make-perform inst machine labels ops pc))
+        ((eq? (car inst) 'label)
+         (lambda () (advance-pc pc)))
         (else
           (error " Unknown instruction type: ASSEMBLE "
                  inst))))
